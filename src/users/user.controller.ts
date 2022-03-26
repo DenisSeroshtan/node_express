@@ -45,6 +45,6 @@ export class UserController extends BaseController implements IUserController {
 		}
 
 		// await newUser.setPassword(body.password);
-		this.ok(res, { email: result.email });
+		this.ok(res, { email: result.email, id: result.id });
 	}
 }
