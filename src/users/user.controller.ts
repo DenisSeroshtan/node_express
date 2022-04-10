@@ -7,14 +7,18 @@ import { IUserController } from './user.controller.interface';
 import { HTTPError } from '../error/http-error.class';
 import { UserLoginDto } from './dto/user-login.dto';
 import { UserRegisterDto } from './dto/user-register.dto';
-import { UserService } from './user.service';
 import { ValidateMiddleware } from '../common/validate.middleware';
+import { IConfigService } from '../config/config.service.interface';
+import { IUserService } from './user.service.interface';
+import { AuthGuard } from '../common/auth.guard';
+import { sign } from 'jsonwebtoken';
 
 @injectable()
 export class UserController extends BaseController implements IUserController {
 	constructor(
 		@inject(TYPES.ILogger) private loggerService: ILogger,
-		@inject(TYPES.UserService) private userService: UserService,
+		@inject(TYPES.UserService) private userService: IUserService,
+		@inject(TYPES.ConfigService) private configService: IConfigService,
 	) {
 		super(loggerService);
 
@@ -31,6 +35,12 @@ export class UserController extends BaseController implements IUserController {
 				func: this.login,
 				middlewares: [new ValidateMiddleware(UserLoginDto)],
 			},
+			{
+				path: '/info',
+				method: 'get',
+				func: this.info,
+				middlewares: [new AuthGuard()],
+			},
 		]);
 	}
 
@@ -45,8 +55,10 @@ export class UserController extends BaseController implements IUserController {
 			next(new HTTPError(401, 'ошибка авторизации', 'login'));
 		}
 
+		const token = await this.signJWT(req.body.email, this.configService.get('SECRET'));
+
 		// await newUser.setPassword(body.password);
-		this.ok(res, {});
+		this.ok(res, { token });
 	}
 
 	async register(
@@ -62,5 +74,26 @@ export class UserController extends BaseController implements IUserController {
 
 		// await newUser.setPassword(body.password);
 		this.ok(res, { email: result.email, id: result.id });
+	}
+
+	async info({ user }: Request, res: Response, next: NextFunction): Promise<void> {
+		const userInfo = await this.userService.getInfo(user);
+		this.ok(res, { email: userInfo?.email, id: userInfo?.id });
+	}
+
+	signJWT(email: string, secret: string): Promise<string> {
+		return new Promise<string>((resolve, reject) => {
+			sign(
+				{ email, iat: Math.floor(Date.now() / 1000) },
+				secret,
+				{ algorithm: 'HS256' },
+				(err, token) => {
+					if (err) {
+						reject(err);
+					}
+					resolve(token as string);
+				},
+			);
+		});
 	}
 }
