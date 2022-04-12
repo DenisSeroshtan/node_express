@@ -31,15 +31,15 @@ interface IBootstrapReturn {
 	appContainer: Container;
 }
 
-function bootstrap(): IBootstrapReturn {
+async function bootstrap(): Promise<IBootstrapReturn> {
 	const appContainer = new Container();
 
 	appContainer.load(appBindings);
 	const app = appContainer.get<App>(TYPES.Application);
 
-	app.init().then((r) => r);
+	await app.init().then((r) => r);
 
 	return { appContainer, app };
 }
 
-export const { app, appContainer } = bootstrap();
+export const boot = bootstrap();
